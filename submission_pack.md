@@ -607,7 +607,7 @@
 ## 三、使用 AI 工具完成任务的对话窗口链接
 
 **公开对话窗口链接：**  
-https://dream123294.github.io/ai-prompt-task-public-chat-20260705/
+https://gist.github.com/dream123294/a87902a443c8dce8e37ec92040c3944b
 
 ---
 
