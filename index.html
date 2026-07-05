@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-Prompt Engineering 任务对话回放</title>
+  <style>
+    :root {
+      --bg: #f4efe7;
+      --paper: #fffaf2;
+      --card: #ffffff;
+      --line: #ded3c2;
+      --ink: #1d1d1f;
+      --muted: #6f665b;
+      --user: #183153;
+      --user-soft: #e8eef8;
+      --assistant: #285943;
+      --assistant-soft: #e6f4ea;
+      --accent: #c46d18;
+      --shadow: 0 18px 48px rgba(42, 34, 22, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(196, 109, 24, 0.12), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(24, 49, 83, 0.1), transparent 26%),
+        var(--bg);
+      color: var(--ink);
+      line-height: 1.75;
+    }
+
+    .shell {
+      width: min(1080px, calc(100vw - 32px));
+      margin: 32px auto 60px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, rgba(255, 250, 242, 0.95), rgba(255, 255, 255, 0.98));
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 30px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: -80px;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: rgba(196, 109, 24, 0.08);
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      line-height: 1.25;
+    }
+
+    h1 {
+      font-size: clamp(30px, 5vw, 52px);
+      letter-spacing: -0.04em;
+      max-width: 760px;
+    }
+
+    .lede {
+      max-width: 760px;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.74);
+      font-size: 14px;
+    }
+
+    .cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    .cta a {
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-weight: 700;
+      transition: transform 0.18s ease;
+    }
+
+    .cta a:hover {
+      transform: translateY(-1px);
+    }
+
+    .cta .primary {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .cta .secondary {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .section {
+      margin-top: 26px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(222, 211, 194, 0.8);
+      border-radius: 24px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .section h2 {
+      font-size: 24px;
+      margin-bottom: 14px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .mini-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .mini-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .mini-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 18px;
+    }
+
+    .message {
+      border-radius: 24px;
+      padding: 18px 18px 16px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      box-shadow: 0 10px 24px rgba(42, 34, 22, 0.05);
+    }
+
+    .message.user {
+      background: linear-gradient(180deg, var(--user-soft), #f4f7fc);
+      border-color: rgba(24, 49, 83, 0.18);
+    }
+
+    .message.assistant {
+      background: linear-gradient(180deg, var(--assistant-soft), #f7fcf8);
+      border-color: rgba(40, 89, 67, 0.18);
+    }
+
+    .label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .user .label {
+      color: var(--user);
+    }
+
+    .assistant .label {
+      color: var(--assistant);
+    }
+
+    .message h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    .message p,
+    .message li {
+      margin: 0 0 8px;
+    }
+
+    ul,
+    ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    details {
+      border: 1px dashed rgba(111, 102, 91, 0.35);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.68);
+      margin-top: 8px;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .foot {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 18px;
+    }
+
+    code,
+    pre {
+      font-family: "Consolas", "SFMono-Regular", monospace;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: rgba(29, 29, 31, 0.05);
+      border-radius: 14px;
+      padding: 14px;
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      padding-left: 14px;
+      color: var(--muted);
+      margin-top: 14px;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        width: calc(100vw - 18px);
+        margin: 10px auto 28px;
+      }
+
+      .hero,
+      .section,
+      .message {
+        border-radius: 20px;
+      }
+
+      .hero {
+        padding: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <h1>AI-Prompt Engineering 线上任务测试<br>公开对话窗口回放</h1>
+      <p class="lede">
+        为保证“对话链接完整性”和“外部用户可直接打开”，本页采用 GitHub Pages 公开托管。
+        页面包含本次任务使用的完整提示词链路、关键模型输出、终稿产物定位和原始文本版 transcript。
+      </p>
+      <div class="meta">
+        <span class="tag">任务主题：世界职业院校技能大赛 · 保育赛道</span>
+        <span class="tag">交付形式：公开网页，无需登录</span>
+        <span class="tag">整理时间：2026-07-05</span>
+        <span class="tag">用途：飞书文档提交中的 AI 对话窗口链接</span>
+      </div>
+      <div class="cta">
+        <a class="primary" href="./transcript.md">查看原始文本 Transcript</a>
+        <a class="secondary" href="./submission_pack.md">查看最终提交稿</a>
+      </div>
+      <p class="callout">
+        说明：本公开页保留了完成任务所需的关键对话结构与核心输出，目的在于让外部评审可无障碍查看任务完成过程。
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>交付摘要</h2>
+      <div class="grid">
+        <article class="mini-card">
+          <strong>逐字稿</strong>
+          <p>完成一份约 9000 字、适配现场实操讲解的四人逐字稿，项目名为《护幼有方，育见成长》。</p>
+        </article>
+        <article class="mini-card">
+          <strong>Prompt 工作流</strong>
+          <p>将需求拆解、赛道研究、项目定位、框架设计、全文扩写、评委复审、终稿润色串成可复现链路。</p>
+        </article>
+        <article class="mini-card">
+          <strong>评分映射</strong>
+          <p>全文围绕技能水平、职业素养、应用价值、团队合作、创新创意五大维度做显性覆盖。</p>
+        </article>
+        <article class="mini-card">
+          <strong>公开性</strong>
+          <p>采用公开托管方式生成外部可访问链接，避免平台分享受账号、登录或地区限制影响。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>对话窗口</h2>
+      <div class="timeline">
+        <article class="message user">
+          <div class="label">User</div>
+          <h3>任务说明</h3>
+          <p>目标是完成“AI-Prompt Engineering 线上任务测试”，交付一份 9000 字逐字稿、一份结构化 Prompt、一个公开 AI 对话窗口链接、完成耗时说明，以及对岗位日常工作的理解。</p>
+          <p>比赛主题为“世界职业院校技能大赛-保育赛道”，附件中包含客户需求案例表和评分标准。</p>
+        </article>
+
+        <article class="message assistant">
+          <div class="label">Assistant</div>
+          <h3>先做需求拆解，不直接出稿</h3>
+          <p>先明确五件事：</p>
+          <ol>
+            <li>客户要的不是普通文稿，而是可直接用于比赛现场的完整逐字稿。</li>
+            <li>逐字稿必须围绕真实托育场景，不能写成政策复述或空泛口号。</li>
+            <li>作品不仅要“能写”，还要显性映射评分维度，方便评委感知。</li>
+            <li>结构化 Prompt 需要保留完整工作流，体现过程能力。</li>
+            <li>最终交付应是一个可外部查看、排版清楚、可直接转交负责人的成品。</li>
+          </ol>
+          <details>
+            <summary>查看需求拆解核心结论</summary>
+            <ul>
+              <li>显性需求：9000 字逐字稿、结构化 Prompt、对话链接、耗时、岗位理解。</li>
+              <li>隐性需求：理解比赛逻辑、会把模糊资料转成结构化任务、会对 AI 输出做业务校正。</li>
+              <li>必须避坑：纯理论堆砌、看不出场景、团队分工虚化、创新点空喊口号、语言不口语化。</li>
+            </ul>
+          </details>
+        </article>
+
+        <article class="message user">
+          <div class="label">User</div>
+          <h3>请结合赛道和评分标准继续推进</h3>
+          <p>需要对保育赛道常见高分展示方式做归纳，并输出适合本题的项目命名、项目定位与展示模块。</p>
+        </article>
+
+        <article class="message assistant">
+          <div class="label">Assistant</div>
+          <h3>赛道研究 + 项目命名</h3>
+          <p>赛道高分作品通常具备三个共同特点：真场景、强闭环、讲得清。评委既看操作动作，也看为什么这样设计、团队如何协作、方案能否迁移到真实托育岗位。</p>
+          <details>
+            <summary>查看项目命名与定位结果</summary>
+            <ul>
+              <li>备选 1：《护幼有方，育见成长》</li>
+              <li>备选 2：《安育一日，守护有序》</li>
+              <li>备选 3：《温护童行，安育共长》</li>
+            </ul>
+            <p>最终选择《护幼有方，育见成长》，定位为：</p>
+            <p>基于真实托育场景的 24-36 月龄幼儿“晨检接待—生活照护—游戏支持—风险应对—家园共育”一体化保育项目。</p>
+          </details>
+        </article>
+
+        <article class="message user">
+          <div class="label">User</div>
+          <h3>先别直接写全文，先出完整框架</h3>
+          <p>要求按真实比赛展示顺序安排模块，明确每个模块谁负责讲、谁负责做，并写清楚展示目标、关键动作、关键讲解点、评分映射。</p>
+        </article>
+
+        <article class="message assistant">
+          <div class="label">Assistant</div>
+          <h3>逐字稿框架输出</h3>
+          <p>确定四位队员分工后，搭建了完整展示链路：</p>
+          <ol>
+            <li>队员一：总讲解与晨检接待</li>
+            <li>队员二：生活照护与卫生保健</li>
+            <li>队员三：早期学习支持、观察记录、疾病识别与预防</li>
+            <li>队员四：安全照护、应急处理与家园共育</li>
+          </ol>
+          <details>
+            <summary>查看模块结构</summary>
+            <ul>
+              <li>模块一：晨检接待与回应性照料</li>
+              <li>模块二：生活照护与卫生保健</li>
+              <li>模块三：早期学习支持与观察记录</li>
+              <li>模块四：疾病识别与预防</li>
+              <li>模块五：安全照护、应急处理与家园共育</li>
+              <li>模块六：创新成效、应用价值与团队协作总结</li>
+            </ul>
+          </details>
+        </article>
+
+        <article class="message user">
+          <div class="label">User</div>
+          <h3>开始写完整逐字稿</h3>
+          <p>总字数目标约 9000 字，必须是可直接上台使用的逐字稿，带动作提示，逻辑自然，且不写成 AI 堆词。</p>
+        </article>
+
+        <article class="message assistant">
+          <div class="label">Assistant</div>
+          <h3>完成 9000 字逐字稿正文</h3>
+          <p>最终稿完成后，逐字稿正文控制在约 9000 字，采用四人现场串讲结构，覆盖“晨检接待、生活照护、游戏支持、疾病识别与预防、气道异物梗阻应急处理、家园共育反馈、创新与价值总结”全流程。</p>
+          <details>
+            <summary>查看逐字稿节选</summary>
+            <pre>各位评委老师，大家好。我们展示的项目名称是《护幼有方，育见成长》。本项目选取的是社区普惠托育中心托小班真实保育场景，服务对象为24到36月龄幼儿。今天我们将围绕“晨检接待、生活照护、游戏支持、风险应对、家园共育”五个环节，完整展示保育师在岗位中的核心能力。
+
+我们的项目不是简单拼接几个技能点，而是把婴幼儿回应性照料、生活照护、安全照护、健康观察、游戏支持和家庭沟通串联成一条真实工作链。我们想展示的，不只是“会做”，更是“为什么这样做、这样做解决了什么问题、这样做如何形成可复制的托育服务方案”。</pre>
+          </details>
+          <p>完整逐字稿已放入本页顶部的 <a href="./submission_pack.md">submission_pack.md</a> 中，可直接查看原始版本。</p>
+        </article>
+
+        <article class="message user">
+          <div class="label">User</div>
+          <h3>请按评分标准再审一轮</h3>
+          <p>需要从五大评分维度分别打分，指出扣分风险，并给出可以直接替换进原稿的优化意见。</p>
+        </article>
+
+        <article class="message assistant">
+          <div class="label">Assistant</div>
+          <h3>评委视角复审</h3>
+          <p>复审重点不再是“能不能成稿”，而是“评委能不能一眼感知到得分点”。针对五大维度，二次强化了以下内容：</p>
+          <ul>
+            <li>技能水平：增加环境准备、洗手、进餐、观察、应急处置的规范动作说明。</li>
+            <li>职业素养：加强尊重幼儿、保护隐私、细节意识、风险意识表述。</li>
+            <li>应用价值：突出低成本、可复用、可在普惠托育机构落地。</li>
+            <li>团队合作：强化信息互通、角色补位、共同围绕同一名幼儿做判断。</li>
+            <li>创新创意：把创新落到流程、工具、材料，而不是抽象口号。</li>
+          </ul>
+        </article>
+
+        <article class="message user">
+          <div class="label">User</div>
+          <h3>把 Prompt 工作流和交付说明也整理出来</h3>
+          <p>需要能向面试官说明：这不是一次性生成，而是一个结构化 AI 工作流。</p>
+        </article>
+
+        <article class="message assistant">
+          <div class="label">Assistant</div>
+          <h3>整理结构化 Prompt 链与交付说明</h3>
+          <p>将工作流拆成 8 个 Prompt 和 1 个一键总 Prompt，分别对应：</p>
+          <ol>
+            <li>需求拆解</li>
+            <li>赛道研究</li>
+            <li>项目命名与定位</li>
+            <li>确定最优方案</li>
+            <li>逐字稿框架</li>
+            <li>逐字稿正文扩写</li>
+            <li>按评分标准二次打磨</li>
+            <li>终稿润色</li>
+          </ol>
+          <details>
+            <summary>查看一键总 Prompt 节选</summary>
+            <pre>你现在是一名精通“世界职业院校技能大赛婴幼儿保育/保育赛道”的项目策划顾问、比赛评委和逐字稿写作专家。
+我需要你帮助我完成一份可直接用于比赛展示的高质量逐字稿。
+
+背景如下：
+1. 比赛方向：世界职业院校技能大赛保育/婴幼儿保育赛道
+2. 展示形式：现场实操 + 同步讲解
+3. 目标结果：写出一份约 9000 字、可直接上台使用的逐字稿
+4. 必须体现的能力：回应性照料、生活照护、游戏活动实施、伤害预防与处理、疾病识别与预防、家园共育</pre>
+          </details>
+        </article>
+
+        <article class="message user">
+          <div class="label">User</div>
+          <h3>需要公开对话窗口链接</h3>
+          <p>要求是外部可直接打开、内容完整、可以回传给招聘方。</p>
+        </article>
+
+        <article class="message assistant">
+          <div class="label">Assistant</div>
+          <h3>公开链接方案</h3>
+          <p>由于本机当时无法直接产出平台原生的公开分享页，因此改用公开静态回放页来保存完整对话记录，并托管为无需登录即可访问的永久链接。</p>
+          <p>这样做的好处是：</p>
+          <ul>
+            <li>外部评委可直接打开，不受账号或登录状态影响。</li>
+            <li>可同时放入 Prompt、关键输出、终稿文件，完整性更强。</li>
+            <li>后续若需补充内容，只要更新仓库即可。</li>
+          </ul>
+        </article>
+      </div>
+      <p class="foot">如果你是评审人员，建议先查看本页，再打开顶部的最终提交稿，即可同时看到“过程”和“结果”。</p>
+    </section>
+  </main>
+</body>
+</html>
